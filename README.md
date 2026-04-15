@@ -11,6 +11,17 @@
 
 ---
 
+![Hardware Setup](assets/hardware_setup.jpeg)
+
+---
+
+## 🎬 Demo
+
+[![Demo Video](assets/hardware_setup.jpeg)](https://youtu.be/V3AjE1x1s3U)
+> ▶️ Click the image above to watch the full demo on YouTube
+
+---
+
 ## 📋 Table of Contents
 
 - [Features](#-features)
@@ -34,6 +45,7 @@
 - 🔔 Buzzer alert for immediate local notification on leak detection
 - 📱 **Blynk app** dashboard for remote real-time monitoring
 - 🚨 **Blynk push notifications** sent to your phone on leak detection
+- 🔁 **Manual override** to control the motor relay via Blynk app
 - 📶 WiFi connectivity via ESP32
 
 ---
@@ -45,7 +57,8 @@
 | ESP32 DevKit | ESP32-WROOM-32 | 1 |
 | Water Flow Sensor | YF-S201 (1–30 L/min) | 2 (inlet & outlet) |
 | LCD Display | 16x2 with I2C module (PCF8574) | 1 |
-| Buzzer | Active buzzer, 5V | 1 |
+| Relay Module | 5V single channel | 1 |
+| LED Indicator | 5mm LED | 1 |
 | Jumper wires | Male-to-male & male-to-female | — |
 | Breadboard | 830 tie-point | 1 |
 | Power Supply | 5V / 2A USB or adapter | 1 |
@@ -60,7 +73,8 @@ flowchart TD
         FS1[Flow Sensor 1 - Inlet]
         FS2[Flow Sensor 2 - Outlet]
         LCD[16x2 LCD Display]
-        BUZ[Buzzer]
+        RELAY[Relay Module]
+        LED[LED Indicator]
         ESP[ESP32 DevKit]
     end
 
@@ -73,10 +87,11 @@ flowchart TD
         NOTIF[Push Notification\nLeak Alert]
     end
 
-    FS1 -->|Pulse signal| ESP
-    FS2 -->|Pulse signal| ESP
-    ESP -->|I2C| LCD
-    ESP -->|GPIO| BUZ
+    FS1 -->|Pulse signal - GPIO 25| ESP
+    FS2 -->|Pulse signal - GPIO 26| ESP
+    ESP -->|I2C - GPIO 21/22| LCD
+    ESP -->|GPIO 5| RELAY
+    ESP -->|GPIO 12| LED
     ESP -->|WiFi| BC
     BC --> APP
     BC --> NOTIF
@@ -92,8 +107,8 @@ flowchart TD
 |---|---|---|
 | VCC | Red | VIN (5V) |
 | GND | Black | GND |
-| Signal — Sensor 1 (Inlet) | Yellow | GPIO 18 |
-| Signal — Sensor 2 (Outlet) | Yellow | GPIO 19 |
+| Signal — Sensor 1 (Inlet) | Yellow | GPIO 25 |
+| Signal — Sensor 2 (Outlet) | Yellow | GPIO 26 |
 
 ### 16x2 LCD Display (I2C Module)
 
@@ -104,12 +119,15 @@ flowchart TD
 | SDA | GPIO 21 |
 | SCL | GPIO 22 |
 
-### Buzzer
+### Relay Module & LED
 
-| Buzzer Pin | ESP32 Pin |
-|---|---|
-| Positive (+) | GPIO 23 |
-| Negative (–) | GND |
+| Component | Pin | ESP32 Pin |
+|---|---|---|
+| Relay | Signal | GPIO 5 |
+| Relay | VCC | 5V |
+| Relay | GND | GND |
+| LED | Positive (+) | GPIO 12 |
+| LED | Negative (–) | GND |
 
 ---
 
@@ -121,7 +139,7 @@ flowchart TD
 
 ### 2. Create a new Template
 - Go to **Blynk Console** → **Templates** → **New Template**
-- Name: `Water Leakage Detector`
+- Name: `water pipe leakage monitoring system`
 - Hardware: `ESP32`
 - Connection: `WiFi`
 
@@ -129,16 +147,22 @@ flowchart TD
 
 | Virtual Pin | Name | Data Type | Purpose |
 |---|---|---|---|
-| V0 | Inlet Flow Rate | Double | Flow rate of inlet sensor (L/min) |
-| V1 | Outlet Flow Rate | Double | Flow rate of outlet sensor (L/min) |
-| V2 | Leak Status | Integer | 0 = Normal, 1 = Leak Detected |
+| V0 | Flow 1 | Double | Inlet flow rate (mL/s) |
+| V1 | Flow 2 | Double | Outlet flow rate (mL/s) |
+| V2 | Motor Control | Integer | 1 = ON, 0 = OFF (manual) |
+| V3 | Mode Toggle | Integer | 1 = Manual, 0 = Auto |
 
 ### 4. Set up the Dashboard (Web & App)
 Add these widgets in the Blynk app:
-- **Gauge** → V0 — Inlet Flow Rate
-- **Gauge** → V1 — Outlet Flow Rate
-- **LED / Indicator** → V2 — Leak Status
-- **Notification** widget — for push alerts
+- **Gauge** → V0 — Flow 1 (Inlet)
+- **Gauge** → V1 — Flow 2 (Outlet)
+- **Button (Switch)** → V2 — Motor ON/OFF (manual control)
+- **Button (Switch)** → V3 — Manual / Auto mode toggle
+- **Event** → `flow_notify` — for leak push notifications
+
+### Dashboard Preview
+
+![Blynk App Dashboard](assets/app_screenshot.jpeg)
 
 ### 5. Get your credentials
 In Blynk Console → your Template → copy:
@@ -146,7 +170,7 @@ In Blynk Console → your Template → copy:
 - `BLYNK_TEMPLATE_NAME`
 - `BLYNK_AUTH_TOKEN`
 
-Paste these into `firmware/config.h`.
+Paste these into `firmware/main/config.h`.
 
 ---
 
@@ -171,26 +195,20 @@ Go to **Sketch → Include Library → Manage Libraries** and install:
 
 ### 3. Configure your credentials
 
-Open `firmware/config.h` and fill in:
+Copy `firmware/main/config.example.h` → rename to `config.h` and fill in:
 
 ```cpp
 // Blynk credentials
-#define BLYNK_TEMPLATE_ID   "your_template_id"
-#define BLYNK_TEMPLATE_NAME "Water Leakage Detector"
-#define BLYNK_AUTH_TOKEN    "your_auth_token"
+#define BLYNK_TEMPLATE_ID    "your_template_id"
+#define BLYNK_TEMPLATE_NAME  "water pipe leakage monitoring system"
+#define BLYNK_AUTH_TOKEN     "your_auth_token"
 
 // WiFi credentials
-#define WIFI_SSID           "your_wifi_name"
-#define WIFI_PASSWORD       "your_wifi_password"
-
-// GPIO Pins
-#define FLOW_SENSOR_1_PIN   18   // Inlet
-#define FLOW_SENSOR_2_PIN   19   // Outlet
-#define BUZZER_PIN          23
-
-// Leak detection threshold
-#define LEAK_THRESHOLD      2.0  // L/min difference to trigger alert
+#define WIFI_SSID     "your_wifi_name"
+#define WIFI_PASSWORD "your_wifi_password"
 ```
+
+> ⚠️ `config.h` is listed in `.gitignore` and will never be committed. Never share your auth token publicly.
 
 ### 4. Flash the ESP32
 
@@ -204,15 +222,17 @@ Open `firmware/config.h` and fill in:
 
 ## ⚙️ How It Works
 
-1. Two **YF-S201 flow sensors** are installed at the **inlet** and **outlet** of the monitored pipe section.
-2. Each sensor generates pulse signals — the ESP32 counts pulses using **hardware interrupts** to calculate **flow rate in L/min**.
+1. Two **YF-S201 flow sensors** are installed at the **inlet** (GPIO 25) and **outlet** (GPIO 26) of the monitored pipe section.
+2. Each sensor generates pulse signals — the ESP32 counts pulses using **hardware interrupts** to calculate **flow rate in mL/s**.
 3. Every second, the ESP32 compares inlet and outlet flow rates.
-4. If the **difference exceeds the threshold** (default: 2 L/min), a **leak is detected**:
-   - 📟 LCD shows `LEAK DETECTED!` with both flow values
-   - 🔔 Buzzer sounds continuously
-   - 📱 Blynk virtual pin V2 is set to `1` (leak)
-   - 🚨 Blynk **push notification** is sent to your phone
-5. When flow returns to normal, the system **auto-resets** and sends an all-clear update.
+4. If **Flow 2 < Flow 1 and Flow 2 < 8 mL/s**, a **leak is detected**:
+   - 📟 LCD shows `Leakage Detected` with `F1 > F2`
+   - 💡 LED turns ON
+   - 🔁 Relay activates (motor shutoff)
+   - 📱 Blynk virtual pins V0 and V1 update in real time
+   - 🚨 Blynk **event** `flow_notify` fires a push notification
+5. **Manual Override (V3):** Switch the system to manual mode via the Blynk app. In manual mode, the relay and LED are controlled directly by the V2 button — auto leak detection is paused.
+6. When switched back to auto, the relay resets and normal monitoring resumes.
 
 ---
 
@@ -223,10 +243,14 @@ water-pipe-leakage-detection/
 ├── README.md
 ├── LICENSE
 ├── .gitignore
+├── assets/
+│   ├── hardware_setup.jpeg     # Hardware photo
+│   └── app_screenshot.jpeg     # Blynk app screenshot
 └── firmware/
     └── main/
-        ├── main.ino               # Main Arduino sketch
-        └── config.h               # WiFi, Blynk & pin configuration
+        ├── main.ino            # Main Arduino sketch
+        ├── config.h            # Your credentials (gitignored)
+        └── config.example.h    # Template — safe to commit
 ```
 
 ---
