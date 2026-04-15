@@ -1,11 +1,12 @@
 # 💧 Water Pipe Leakage Detection System
 
-> An IoT-based water pipe leakage detection system using **ESP32** and **water flow sensors**.  
-> The system monitors real-time water flow, detects anomalies indicating leaks, and sends instant alerts via MQTT.
+> An IoT-based water pipe leakage detection system using **ESP32**, **water flow sensors**, and **Blynk IoT**.  
+> The system monitors real-time water flow, detects anomalies indicating leaks, and sends instant alerts via the Blynk app.
 
 ![Platform](https://img.shields.io/badge/Platform-ESP32-blue)
+![IDE](https://img.shields.io/badge/IDE-Arduino-teal)
+![IoT](https://img.shields.io/badge/IoT-Blynk-purple)
 ![Sensor](https://img.shields.io/badge/Sensor-YF--S201-green)
-![Protocol](https://img.shields.io/badge/Protocol-MQTT-orange)
 ![License](https://img.shields.io/badge/License-MIT-yellow)
 
 ---
@@ -16,7 +17,8 @@
 - [Hardware Required](#-hardware-required)
 - [System Architecture](#-system-architecture)
 - [Circuit Wiring](#-circuit-wiring)
-- [Software Setup](#-software-setup)
+- [Blynk Setup](#-blynk-setup)
+- [Arduino IDE Setup](#-arduino-ide-setup)
 - [How It Works](#-how-it-works)
 - [Project Structure](#-project-structure)
 - [Contributing](#-contributing)
@@ -27,13 +29,12 @@
 ## ✨ Features
 
 - 📊 Real-time flow rate monitoring using YF-S201 water flow sensors
-- 🔍 Leak detection algorithm based on inlet vs outlet flow differential
-- 📟 Live readings displayed on **16x2 LCD (I2C)**
-- 📶 WiFi connectivity via ESP32 for cloud data publishing
-- 📡 MQTT-based communication with a central monitoring dashboard
+- 🔍 Leak detection based on inlet vs outlet flow rate differential
+- 📟 Live flow readings displayed on **16x2 LCD (I2C)**
 - 🔔 Buzzer alert for immediate local notification on leak detection
-- 🌐 Web dashboard with flow rate charts and alert history
-- 💾 Historical data logging for trend analysis
+- 📱 **Blynk app** dashboard for remote real-time monitoring
+- 🚨 **Blynk push notifications** sent to your phone on leak detection
+- 📶 WiFi connectivity via ESP32
 
 ---
 
@@ -63,26 +64,22 @@ flowchart TD
         ESP[ESP32 DevKit]
     end
 
-    subgraph Cloud ["☁️ Cloud Layer"]
-        MQTT[MQTT Broker\ne.g. Mosquitto / HiveMQ]
-        BE[Backend Server\nPython / Node.js]
-        DB[(Database\nInfluxDB / SQLite)]
+    subgraph Cloud ["☁️ Blynk Cloud"]
+        BC[Blynk Server]
     end
 
-    subgraph Output ["📤 Output Layer"]
-        DASH[Web Dashboard]
-        ALERT[Email / SMS Alert]
+    subgraph Output ["📤 Output"]
+        APP[Blynk Mobile App\niOS / Android]
+        NOTIF[Push Notification\nLeak Alert]
     end
 
     FS1 -->|Pulse signal| ESP
     FS2 -->|Pulse signal| ESP
     ESP -->|I2C| LCD
     ESP -->|GPIO| BUZ
-    ESP -->|WiFi / TCP| MQTT
-    MQTT --> BE
-    BE --> DB
-    BE --> DASH
-    BE --> ALERT
+    ESP -->|WiFi| BC
+    BC --> APP
+    BC --> NOTIF
 ```
 
 ---
@@ -91,18 +88,18 @@ flowchart TD
 
 ### Water Flow Sensors (YF-S201)
 
-| YF-S201 Wire | ESP32 Pin |
-|---|---|
-| Red (VCC) | 5V (VIN) |
-| Black (GND) | GND |
-| Yellow (Signal) — Sensor 1 | GPIO 18 |
-| Yellow (Signal) — Sensor 2 | GPIO 19 |
+| YF-S201 Wire | Color | ESP32 Pin |
+|---|---|---|
+| VCC | Red | VIN (5V) |
+| GND | Black | GND |
+| Signal — Sensor 1 (Inlet) | Yellow | GPIO 18 |
+| Signal — Sensor 2 (Outlet) | Yellow | GPIO 19 |
 
-### 16x2 LCD (I2C Module)
+### 16x2 LCD Display (I2C Module)
 
 | LCD I2C Pin | ESP32 Pin |
 |---|---|
-| VCC | 3.3V or 5V |
+| VCC | 5V (VIN) |
 | GND | GND |
 | SDA | GPIO 21 |
 | SCL | GPIO 22 |
@@ -116,68 +113,106 @@ flowchart TD
 
 ---
 
-## 💻 Software Setup
+## 📱 Blynk Setup
 
-### 1. Clone the repository
+### 1. Create a Blynk account
+- Download the **Blynk IoT** app on [Android](https://play.google.com/store/apps/details?id=cloud.blynk) or [iOS](https://apps.apple.com/app/blynk-iot/id1559317868)
+- Sign up at [blynk.cloud](https://blynk.cloud)
 
-```bash
-git clone https://github.com/adhilmm18/water-pipe-leakage-detection.git
-cd water-pipe-leakage-detection
+### 2. Create a new Template
+- Go to **Blynk Console** → **Templates** → **New Template**
+- Name: `Water Leakage Detector`
+- Hardware: `ESP32`
+- Connection: `WiFi`
+
+### 3. Add Datastreams (Virtual Pins)
+
+| Virtual Pin | Name | Data Type | Purpose |
+|---|---|---|---|
+| V0 | Inlet Flow Rate | Double | Flow rate of inlet sensor (L/min) |
+| V1 | Outlet Flow Rate | Double | Flow rate of outlet sensor (L/min) |
+| V2 | Leak Status | Integer | 0 = Normal, 1 = Leak Detected |
+
+### 4. Set up the Dashboard (Web & App)
+Add these widgets in the Blynk app:
+- **Gauge** → V0 — Inlet Flow Rate
+- **Gauge** → V1 — Outlet Flow Rate
+- **LED / Indicator** → V2 — Leak Status
+- **Notification** widget — for push alerts
+
+### 5. Get your credentials
+In Blynk Console → your Template → copy:
+- `BLYNK_TEMPLATE_ID`
+- `BLYNK_TEMPLATE_NAME`
+- `BLYNK_AUTH_TOKEN`
+
+Paste these into `firmware/config.h`.
+
+---
+
+## 🖥️ Arduino IDE Setup
+
+### 1. Install ESP32 board in Arduino IDE
+
+Go to **File → Preferences** and add this URL to Additional Board Manager URLs:
 ```
+https://raw.githubusercontent.com/espressif/arduino-esp32/gh-pages/package_esp32_index.json
+```
+Then go to **Tools → Board → Board Manager**, search `esp32`, and install.
 
-### 2. Install required Arduino libraries
+### 2. Install required libraries
 
-Open Arduino IDE → **Library Manager** and install:
+Go to **Sketch → Include Library → Manage Libraries** and install:
 
-- `LiquidCrystal_I2C` by Frank de Brabander
-- `PubSubClient` by Nick O'Leary
-- `WiFi` (built-in with ESP32 board package)
+| Library | Author |
+|---|---|
+| `Blynk` | Volodymyr Shymanskyy |
+| `LiquidCrystal_I2C` | Frank de Brabander |
 
-### 3. Configure credentials
+### 3. Configure your credentials
 
-Open `firmware/config.h` and update:
+Open `firmware/config.h` and fill in:
 
 ```cpp
-#define WIFI_SSID       "your_wifi_name"
-#define WIFI_PASSWORD   "your_wifi_password"
-#define MQTT_BROKER     "broker.hivemq.com"
-#define MQTT_PORT       1883
-#define LEAK_THRESHOLD  2.0   // L/min difference to trigger alert
+// Blynk credentials
+#define BLYNK_TEMPLATE_ID   "your_template_id"
+#define BLYNK_TEMPLATE_NAME "Water Leakage Detector"
+#define BLYNK_AUTH_TOKEN    "your_auth_token"
+
+// WiFi credentials
+#define WIFI_SSID           "your_wifi_name"
+#define WIFI_PASSWORD       "your_wifi_password"
+
+// GPIO Pins
+#define FLOW_SENSOR_1_PIN   18   // Inlet
+#define FLOW_SENSOR_2_PIN   19   // Outlet
+#define BUZZER_PIN          23
+
+// Leak detection threshold
+#define LEAK_THRESHOLD      2.0  // L/min difference to trigger alert
 ```
 
 ### 4. Flash the ESP32
 
-- Open `firmware/src/main.cpp` in Arduino IDE
-- Select board: **ESP32 Dev Module**
-- Select the correct COM port
-- Click **Upload**
-
-### 5. Run the backend server
-
-```bash
-cd backend
-pip install -r requirements.txt
-python server.py
-```
-
-### 6. Open the dashboard
-
-Open `dashboard/index.html` in your browser or deploy to a local server.
+- Open `firmware/main/main.ino` in Arduino IDE
+- Go to **Tools → Board** → select **ESP32 Dev Module**
+- Go to **Tools → Port** → select your COM port
+- Click **Upload** (→)
+- Open **Serial Monitor** at `115200 baud` to see debug output
 
 ---
 
 ## ⚙️ How It Works
 
-1. **Two flow sensors** are placed at the inlet and outlet of the pipe segment being monitored.
-2. Each sensor generates **pulse signals** proportional to the flow rate — the ESP32 counts these pulses using interrupts.
-3. The ESP32 calculates the **flow rate (L/min)** for both sensors every second.
-4. If the **difference between inlet and outlet flow** exceeds a configurable threshold (default: 2 L/min), a **leak is detected**.
-5. On leak detection:
-   - The **LCD displays** a "LEAK DETECTED!" warning with the flow values
-   - The **buzzer sounds** an alert
-   - An MQTT message is **published to the broker**
-   - The backend server **logs the event** and sends notifications
-6. Real-time data is continuously streamed to the **web dashboard**.
+1. Two **YF-S201 flow sensors** are installed at the **inlet** and **outlet** of the monitored pipe section.
+2. Each sensor generates pulse signals — the ESP32 counts pulses using **hardware interrupts** to calculate **flow rate in L/min**.
+3. Every second, the ESP32 compares inlet and outlet flow rates.
+4. If the **difference exceeds the threshold** (default: 2 L/min), a **leak is detected**:
+   - 📟 LCD shows `LEAK DETECTED!` with both flow values
+   - 🔔 Buzzer sounds continuously
+   - 📱 Blynk virtual pin V2 is set to `1` (leak)
+   - 🚨 Blynk **push notification** is sent to your phone
+5. When flow returns to normal, the system **auto-resets** and sends an all-clear update.
 
 ---
 
@@ -188,36 +223,27 @@ water-pipe-leakage-detection/
 ├── README.md
 ├── LICENSE
 ├── .gitignore
-├── firmware/
-│   ├── src/
-│   │   ├── main.cpp               # Main ESP32 code
-│   │   ├── flow_sensor.cpp/.h     # Flow sensor logic
-│   │   ├── lcd_display.cpp/.h     # 16x2 LCD display functions
-│   │   ├── wifi_mqtt.cpp/.h       # WiFi & MQTT communication
-│   │   └── leakage_detection.cpp/.h  # Leak detection algorithm
-│   ├── config.h                   # WiFi, MQTT, threshold settings
-│   └── platformio.ini             # PlatformIO config (optional)
-├── hardware/
-│   ├── wiring_diagram.png         # Circuit wiring diagram
-│   ├── schematic.pdf              # Full circuit schematic
-│   └── components_list.md         # Bill of materials
-├── backend/
-│   ├── server.py                  # Flask/FastAPI server
-│   ├── mqtt_subscriber.py         # MQTT data listener
-│   ├── requirements.txt           # Python dependencies
-│   └── docker-compose.yml         # Optional Docker setup
-├── dashboard/
-│   ├── index.html                 # Web monitoring dashboard
-│   └── app.js                     # Dashboard JavaScript
-├── docs/
-│   ├── system_architecture.md
-│   ├── how_it_works.md
-│   └── setup_guide.md
-└── tests/
-    ├── test_flow_sensor.py
-    └── test_leak_detection.py
+└── firmware/
+    └── main/
+        ├── main.ino               # Main Arduino sketch
+        └── config.h               # WiFi, Blynk & pin configuration
 ```
 
+---
+
+## 🤝 Contributing
+
+Contributions are welcome! To contribute:
+
+1. Fork the repository
+2. Create a feature branch: `git checkout -b feature/your-feature-name`
+3. Commit your changes: `git commit -m "Add your feature"`
+4. Push to the branch: `git push origin feature/your-feature-name`
+5. Open a Pull Request
+
+Please open an **issue** first to discuss major changes.
+
+---
 
 ## 📄 License
 
