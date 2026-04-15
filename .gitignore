@@ -1,41 +1,100 @@
-# Prerequisites
+# ============================================================
+# 🔐 CREDENTIALS — NEVER COMMIT
+# ============================================================
+firmware/main/config.h
+config.h
+
+# ============================================================
+# 🛠️ ARDUINO IDE
+# ============================================================
+# Build output
+build/
+*.elf
+*.bin
+*.hex
+*.map
+*.lst
 *.d
 
-# Compiled Object files
-*.slo
-*.lo
-*.o
-*.obj
+# Arduino IDE preferences & cache
+.arduino15/
+arduino-cli.yaml
 
-# Precompiled Headers
-*.gch
-*.pch
+# Backup files created by Arduino IDE
+*.bak
+*.backup
 
-# Linker files
-*.ilk
+# ============================================================
+# 📦 ARDUINO LIBRARIES (installed locally)
+# ============================================================
+libraries/
+firmware/libraries/
 
-# Debugger Files
-*.pdb
+# ============================================================
+# 💻 IDEs & EDITORS
+# ============================================================
 
-# Compiled Dynamic libraries
-*.so
-*.dylib
-*.dll
+# VS Code
+.vscode/
+*.code-workspace
 
-# Fortran module files
-*.mod
-*.smod
+# CLion / IntelliJ
+.idea/
+*.iml
+cmake-build-*/
 
-# Compiled Static libraries
-*.lai
-*.la
-*.a
-*.lib
+# Eclipse
+.project
+.cproject
+.settings/
 
-# Executables
-*.exe
-*.out
-*.app
+# Sublime Text
+*.sublime-project
+*.sublime-workspace
 
-# debug information files
-*.dwo
+# Vim / Neovim
+*.swp
+*.swo
+*~
+
+# ============================================================
+# 🖥️ OPERATING SYSTEMS
+# ============================================================
+
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+._*
+.Spotlight-V100
+.Trashes
+
+# Windows
+Thumbs.db
+Thumbs.db:encryptable
+ehthumbs.db
+Desktop.ini
+$RECYCLE.BIN/
+*.lnk
+
+# Linux
+*~
+.directory
+.Trash-*
+
+# ============================================================
+# 📝 LOGS & DEBUG
+# ============================================================
+*.log
+logs/
+serial_output/
+debug/
+
+# ============================================================
+# 🗜️ MISC
+# ============================================================
+*.tmp
+*.temp
+.env
+*.zip
+*.tar.gz
